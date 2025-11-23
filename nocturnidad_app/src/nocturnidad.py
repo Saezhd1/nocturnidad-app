@@ -1,12 +1,5 @@
-from datetime import time
+from datetime import time, timedelta
 from .utils import construir_dt, minutos_solape, tarifa_por_fecha
-
-FRANJAS = [
-    # Franja nocturna 1: 22:00–00:59 (cruza medianoche)
-    ('22:00', '00:59'),
-    # Franja nocturna 2: 04:00–06:00 (mismo día)
-    ('04:00', '06:00'),
-]
 
 def _time_from_str(s):
     hh, mm = s.split(':')
@@ -18,15 +11,18 @@ def _split_pair(pair_str):
     return _time_from_str(a), _time_from_str(b)
 
 def _franjas_dt(fecha):
-    # Franja nocturna 1: 22:00–00:59 (cruza medianoche)
+    """
+    Construye las franjas nocturnas para una fecha dada:
+    - Franja 1: 22:00 → 00:59 (cruza medianoche)
+    - Franja 2: 04:00 → 06:00 (mismo día)
+    """
     f1_ini = time(22, 0)
     f1_fin = time(0, 59)
     f2_ini = time(4, 0)
     f2_fin = time(6, 0)
 
-    # Inicio de franja 1 en el mismo día
+    # Franja 1 cruza medianoche: inicio en fecha, fin en fecha+1
     f1_ini_dt = construir_dt(fecha, f1_ini)
-    # Fin de franja 1 al día siguiente (porque cruza medianoche)
     f1_fin_dt = construir_dt(fecha, f1_fin) + timedelta(days=1)
 
     # Franja 2 en el mismo día
@@ -39,6 +35,10 @@ def _franjas_dt(fecha):
     ]
 
 def calcular_nocturnidad_por_dia(registros):
+    """
+    Calcula los minutos nocturnos y el importe por cada día.
+    registros: lista de dicts con {'fecha': date, 'hi': str, 'hf': str}
+    """
     resultados = []
     for r in registros:
         fecha = r['fecha']
@@ -47,21 +47,27 @@ def calcular_nocturnidad_por_dia(registros):
 
         tramos = []
         if r.get('hi'):
-            a, b = _split_pair(r['hi'])
-            tramos.append((a, b))
+            try:
+                a, b = _split_pair(r['hi'])
+                tramos.append((a, b))
+            except Exception:
+                pass
         if r.get('hf'):
-            a, b = _split_pair(r['hf'])
-            tramos.append((a, b))
+            try:
+                a, b = _split_pair(r['hf'])
+                tramos.append((a, b))
+            except Exception:
+                pass
 
         franjas_dt = _franjas_dt(fecha)
 
         for (t_ini, t_fin) in tramos:
-            # tramo puede cruzar medianoche si t_fin < t_ini => pasa al día siguiente
+            # tramo puede cruzar medianoche si t_fin < t_ini
             tramo_ini_dt = construir_dt(fecha, t_ini)
             tramo_fin_dt = construir_dt(fecha, t_fin)
             if t_fin < t_ini:
-                # cruzó medianoche
-                tramo_fin_dt = tramo_fin_dt.replace(day=fecha.day+1)
+                # cruzó medianoche → sumamos un día al fin
+                tramo_fin_dt = tramo_fin_dt + timedelta(days=1)
 
             for (f_ini, f_fin) in franjas_dt:
                 minutos += minutos_solape(tramo_ini_dt, tramo_fin_dt, f_ini, f_fin)
@@ -72,5 +78,5 @@ def calcular_nocturnidad_por_dia(registros):
             'minutos_nocturnos': minutos,
             'importe': f"{importe:.2f}"
         })
-
     return resultados
+    
