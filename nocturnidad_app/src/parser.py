@@ -7,10 +7,11 @@ def parse_pdf(file):
         with pdfplumber.open(file) as pdf:
             for page in pdf.pages:
                 text = page.extract_text() or ""
+                # Dividir por líneas
                 for line in text.splitlines():
                     # Buscar fecha dd/mm/yyyy
                     fecha_m = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", line)
-                    # Buscar todas las horas HH:MM
+                    # Buscar todas las horas HH:MM en la línea
                     horas = re.findall(r"\b([0-2]?\d:[0-5]\d)\b", line)
 
                     if fecha_m and len(horas) >= 2:
