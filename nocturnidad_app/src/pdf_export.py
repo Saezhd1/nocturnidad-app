@@ -1,16 +1,18 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+)
+from reportlab.lib.units import cm
+from reportlab.pdfgen import canvas
 from io import BytesIO
 
 def _tabla_dias(resultados_por_pdf):
-    # Une todas las filas: archivo, fecha, min, importe
     rows = [["Archivo", "Fecha", "Minutos nocturnos", "Importe (€)"]]
     for doc in resultados_por_pdf:
         fn = doc['filename']
         for d in doc['dias']:
-            # 🔎 Filtramos: solo añadimos si minutos_nocturnos > 0
             if d['minutos_nocturnos'] > 0:
                 rows.append([fn, d['fecha'], str(d['minutos_nocturnos']), d['importe']])
     return rows
@@ -26,17 +28,32 @@ def _tabla_global(resumen):
     return [["Total minutos", "Total importe (€)", "Total días"],
             [str(t['minutos']), f"{t['importe']:.2f}", str(t['dias'])]]
 
+def pie_de_pagina(canvas, doc):
+    page_num = canvas.getPageNumber()
+    text = f"{page_num} de {doc.pageCount}"
+    canvas.saveState()
+    canvas.setFont('Helvetica', 8)
+    canvas.drawString(36, 20, "(MCT) Movimiento Social Laboral de Conductores de TITSA")
+    canvas.drawRightString(550, 20, text)
+    canvas.restoreState()
+
 def exportar_pdf_informe(empleado, nombre, resultados, resumen):
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
     styles = getSampleStyleSheet()
     story = []
 
-    title = Paragraph(f"Informe de nocturnidad", styles['Title'])
-    ident = Paragraph(f"Número de empleado: {empleado} &nbsp;&nbsp;|&nbsp;&nbsp; Nombre: {nombre}", styles['Normal'])
-    story += [title, Spacer(1, 12), ident, Spacer(1, 24)]
+    # Logo + encabezado
+    logo = Image("static/mct_logo.png", width=2.5*cm, height=2.5*cm)
+    story += [logo, Spacer(1, 6)]
+    story += [Paragraph("MCT", styles['Title']), Spacer(1, 6)]
+    story += [Paragraph("Informe tramos de nocturnidad del servicio realizado", styles['Heading1']), Spacer(1, 24)]
 
-    # Tabla por días (ya filtrada)
+    # Identificación
+    ident = Paragraph(f"Número de empleado: {empleado} &nbsp;&nbsp;|&nbsp;&nbsp; Nombre: {nombre}", styles['Normal'])
+    story += [ident, Spacer(1, 24)]
+
+    # Tabla por días
     dias_tbl = Table(_tabla_dias(resultados))
     dias_tbl.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#eeeeee')),
@@ -64,7 +81,22 @@ def exportar_pdf_informe(empleado, nombre, resultados, resumen):
         ('ALIGN', (0,1), (-1,1), 'RIGHT'),
         ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold')
     ]))
-    story += [Paragraph("Resumen global", styles['Heading2']), Spacer(1, 6), global_tbl]
+    story += [Paragraph("Resumen global", styles['Heading2']), Spacer(1, 6), global_tbl, Spacer(1, 24)]
 
-    doc.build(story)
+    # Explicación final
+    explicacion = """
+    Este informe calcula los minutos de nocturnidad según los tramos definidos en el ACTA acuerdo de nocturnidad emitido por:
+    JUZGADO DE LO SOCIAL Nº4 de S/C de Tenerife
+    Procedimiento: Ejecución de títulos judiciales
+    Nº Procedimiento 0000055/2025<br/>
+    <b>Importe por minuto:</b><br/>
+    - Desde el 30/03/2022 Hasta el 25/04/2025: 0,05 € (1h=3€)<br/>
+    - Desde el 26/04/2025: 0,062 € (1h=3,72€)<br/><br/>
+    <b>Tramos nocturnos considerados:</b><br/>
+    - 22:00 a 00:59<br/>
+    - 04:00 a 06:00
+    """
+    story += [Paragraph(explicacion, styles['Normal'])]
+
+    doc.build(story, onFirstPage=pie_de_pagina, onLaterPages=pie_de_pagina)
     return buffer
