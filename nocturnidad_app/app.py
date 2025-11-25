@@ -25,7 +25,6 @@ def upload():
         calculado = calcular_nocturnidad_por_dia(registros)
         resultados.append({"filename": f.filename, "dias": calculado})
 
-        # actualizar resumen global
         for d in calculado:
             minutos = d["minutos_nocturnos"]
             importe = float(d["importe"])
@@ -34,7 +33,6 @@ def upload():
                 resumen["global"]["importe"] += importe
                 resumen["global"]["dias"] += 1
 
-    # guardar en sesión para descargar después
     session["payload"] = {
         "empleado": empleado,
         "nombre": nombre,
@@ -45,7 +43,6 @@ def upload():
     return render_template("result.html", empleado=empleado, nombre=nombre,
                            resultados=resultados, resumen=resumen)
 
-# ✅ Ruta simple y estable
 @app.route("/download")
 def download():
     payload = session.get("payload")
