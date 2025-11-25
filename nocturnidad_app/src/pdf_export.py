@@ -5,8 +5,8 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 )
 from reportlab.lib.units import cm
-from reportlab.pdfgen import canvas
 from io import BytesIO
+from PyPDF2 import PdfReader
 
 def _tabla_dias(resultados_por_pdf):
     rows = [["Archivo", "Fecha", "Minutos nocturnos", "Importe (€)"]]
@@ -28,14 +28,24 @@ def _tabla_global(resumen):
     return [["Total minutos", "Total importe (€)", "Total días"],
             [str(t['minutos']), f"{t['importe']:.2f}", str(t['dias'])]]
 
-def pie_de_pagina(canvas, doc):
-    page_num = canvas.getPageNumber()
-    text = f"{page_num} de {doc.pageCount}"
-    canvas.saveState()
-    canvas.setFont('Helvetica', 8)
-    canvas.drawString(36, 20, "(MCT) Movimiento Social Laboral de Conductores de TITSA")
-    canvas.drawRightString(550, 20, text)
-    canvas.restoreState()
+def contar_paginas(story):
+    temp_buffer = BytesIO()
+    temp_doc = SimpleDocTemplate(temp_buffer, pagesize=A4)
+    temp_doc.build(story)
+    temp_buffer.seek(0)
+    reader = PdfReader(temp_buffer)
+    return len(reader.pages)
+
+def pie_de_pagina(total_pages):
+    def inner(canvas, doc):
+        page_num = canvas.getPageNumber()
+        text = f"{page_num} de {total_pages}"
+        canvas.saveState()
+        canvas.setFont('Helvetica', 8)
+        canvas.drawString(36, 20, "(MCT) Movimiento Social Laboral de Conductores de TITSA")
+        canvas.drawRightString(550, 20, text)
+        canvas.restoreState()
+    return inner
 
 def exportar_pdf_informe(empleado, nombre, resultados, resumen):
     buffer = BytesIO()
@@ -98,6 +108,9 @@ def exportar_pdf_informe(empleado, nombre, resultados, resumen):
     """
     story += [Paragraph(explicacion, styles['Normal'])]
 
-    doc.build(story, onFirstPage=pie_de_pagina, onLaterPages=pie_de_pagina)
-    return buffer
+    # Calcular total de páginas
+    total_pages = contar_paginas(story)
 
+    # Construir documento con pie de página
+    doc.build(story, onFirstPage=pie_de_pagina(total_pages), onLaterPages=pie_de_pagina(total_pages))
+    return buffer
