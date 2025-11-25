@@ -1,17 +1,14 @@
 import pdfplumber
 import re
 
-# Regex estricta para horas válidas HH:MM (00–23)
+# Regex para horas HH:MM válidas y fecha DD/MM/AAAA
 HHMM = re.compile(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b")
+FECHA = re.compile(r"\b\d{2}/\d{2}/\d{4}\b")
 
 def _in_range(xmid, xr, tol=2):
     return xr[0] - tol <= xmid <= xr[1] + tol
 
 def _find_columns(page):
-    """
-    Encuentra rangos X para columnas clave. Si no detecta cabeceras,
-    usa rangos fijos calibrados para el modelo TITSA.
-    """
     words = page.extract_words(use_text_flow=True)
     fecha_x = hi_x = hf_x = None
     header_bottom = page.bbox[1] + 40
@@ -25,7 +22,6 @@ def _find_columns(page):
         elif t == "hf":
             hf_x = (w["x0"], w["x1"]); header_bottom = max(header_bottom, w["bottom"])
 
-    # Fallback si no encuentra cabeceras
     if not (fecha_x and hi_x and hf_x):
         x0_page, x1_page = page.bbox[0], page.bbox[2]
         width = x1_page - x0_page
@@ -42,14 +38,14 @@ def parse_pdf(file):
             last_fecha = None
             for page in pdf.pages:
                 text_probe = (page.extract_text() or "").lower()
-                # Saltar páginas de totales
+                # Evitar tablas de totales
                 if "tabla de totalizados" in text_probe and "fecha" not in text_probe:
                     continue
 
                 cols = _find_columns(page)
                 words = page.extract_words(x_tolerance=2, y_tolerance=2, use_text_flow=False)
 
-                # Agrupar por línea
+                # Agrupar por línea Y
                 lines = {}
                 for w in words:
                     if w["top"] <= cols["header_bottom"]:
@@ -71,28 +67,34 @@ def parse_pdf(file):
                         elif _in_range(xmid, cols["hf"]):
                             hf_tokens.append(t)
 
-                    fecha_val = " ".join(fecha_tokens).strip()
+                    # 1) Capturar fecha estricta en la línea
+                    fecha_raw = " ".join(fecha_tokens).strip()
+                    match_fecha = FECHA.search(fecha_raw)
+                    fecha_val = match_fecha.group(0) if match_fecha else None
+
+                    # Caso especial de subfila (rowspan visual): un solo token como "1" bajo la fecha
+                    es_subfila = (not fecha_val) and (len(fecha_tokens) == 1) and (fecha_tokens[0].isdigit())
+                    if es_subfila and last_fecha:
+                        fecha_val = last_fecha  # solo en caso detectado de subfila
+
+                    # 2) Extraer horas completas
                     hi_raw = " ".join(hi_tokens).strip()
                     hf_raw = " ".join(hf_tokens).strip()
-
-                    # Herencia de fecha en filas partidas
-                    if not fecha_val and (hi_raw or hf_raw) and last_fecha:
-                        fecha_val = last_fecha
-                    elif fecha_val:
-                        last_fecha = fecha_val
-
-                    # Filtrar registros sin fecha
-                    if not fecha_val.strip():
-                        continue
-
-                    # Extraer horas completas con finditer
                     hi_list = [m.group(0) for m in HHMM.finditer(hi_raw)]
                     hf_list = [m.group(0) for m in HHMM.finditer(hf_raw)]
+
+                    # 3) Rechazar líneas sin fecha y sin horas
+                    if not fecha_val:
+                        # Sin fecha: no procesar (evita corrimientos como 07/08 ← 08/08)
+                        continue
+
+                    # Persistir última fecha válida (para subfilas legítimas únicamente)
+                    last_fecha = fecha_val
 
                     if not hi_list or not hf_list:
                         continue
 
-                    # Tramo principal
+                    # 4) Aplicar la regla Daniel: principal arriba HI, abajo HF
                     registros.append({
                         "fecha": fecha_val,
                         "hi": hi_list[0],
@@ -100,7 +102,7 @@ def parse_pdf(file):
                         "principal": True
                     })
 
-                    # Tramo secundario
+                    # Secundario: HI abajo con HF arriba (si existen ambos)
                     if len(hi_list) >= 2 and len(hf_list) >= 2:
                         registros.append({
                             "fecha": fecha_val,
