@@ -24,7 +24,8 @@ def calcular_nocturnidad_global(registros):
         minutos_nocturnos = 0
         actual = hi
         while actual < hf:
-            if actual.hour >= NOCTURNIDAD_INICIO or actual.hour < NOCTURNIDAD_FIN:
+            h = actual.hour
+            if h >= NOCTURNIDAD_INICIO or h < NOCTURNIDAD_FIN:
                 minutos_nocturnos += 1
             actual += timedelta(minutes=1)
 
@@ -41,7 +42,12 @@ def calcular_nocturnidad_global(registros):
         total_minutos += minutos_nocturnos
         total_importe += importe
 
-    print("[nocturnidad] detalle calculado:", detalle)
+        # 🔎 Log detallado por tramo
+        print(f"[nocturnidad] {r['fecha']} {r['hi']}-{r['hf']} -> {minutos_nocturnos} min, {round(importe,2)} €")
+
+    # 🔎 Log resumen global
+    print(f"[nocturnidad] Total: {total_minutos} min, {round(total_importe,2)} €")
+
     return {
         "detalle": detalle,
         "total_minutos": total_minutos,
