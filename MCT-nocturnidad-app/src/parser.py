@@ -35,7 +35,6 @@ def parse_pdf(file):
     registros = []
     try:
         with pdfplumber.open(file) as pdf:
-            last_fecha = None
             for page in pdf.pages:
                 cols = _find_columns(page)
                 words = page.extract_words(x_tolerance=2, y_tolerance=2, use_text_flow=False)
@@ -45,7 +44,7 @@ def parse_pdf(file):
                 for w in words:
                     if w["top"] <= cols["header_bottom"]:
                         continue
-                    y_key = round(w["top"], 1)
+                    y_key = round(w["top"], 5)
                     lines.setdefault(y_key, []).append(w)
 
                 # Ordenar por vertical
@@ -108,5 +107,6 @@ def parse_pdf(file):
     for r in registros[:6]:
         print("[parser] Ej:", r)
     return registros
+
 
 
