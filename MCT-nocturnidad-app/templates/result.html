@@ -1,15 +1,38 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Resultados de nocturnidad</title>
+    <title>MCT Resultados de nocturnidad por acuerdo judicial</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-top: 20px;
+        }
+        th {
+            background-color: #2c3e50;
+            color: #fff;
+            padding: 8px;
+        }
+        td {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+        }
+        tr.nocturnidad {
+            background-color: #eafaf1; /* verde claro para filas con nocturnidad */
+        }
+        tr.sin-nocturnidad {
+            background-color: #f9f9f9; /* gris claro para filas sin nocturnidad */
+            color: #888;
+        }
+    </style>
 </head>
 <body>
     <h1>Informe de nocturnidad</h1>
     <p>Empleado: {{ empleado }} | Nombre: {{ nombre }}</p>
 
     <h2>Detalle por tramos</h2>
-    <table border="1" cellpadding="4" cellspacing="0">
+    <table>
         <tr>
             <th>Archivo</th>
             <th>Fecha</th>
@@ -20,8 +43,7 @@
         </tr>
         {% for doc in resultados %}
             {% for d in doc.dias %}
-                {% if d.minutos_nocturnos > 0 %}
-                <tr>
+                <tr class="{% if d.minutos_nocturnos > 0 %}nocturnidad{% else %}sin-nocturnidad{% endif %}">
                     <td>{{ doc.filename }}</td>
                     <td>{{ d.fecha }}</td>
                     <td>{{ d.hi }}</td>
@@ -29,13 +51,12 @@
                     <td style="text-align:right">{{ d.minutos_nocturnos }}</td>
                     <td style="text-align:right">{{ d.importe }}</td>
                 </tr>
-                {% endif %}
             {% endfor %}
         {% endfor %}
     </table>
 
     <h2>Resumen mensual</h2>
-    <table border="1" cellpadding="4" cellspacing="0">
+    <table>
         <tr>
             <th>Mes/Año</th>
             <th>Minutos</th>
