@@ -82,8 +82,6 @@ def parse_pdf(file):
                     # Heredar fecha solo si la fila es válida
                     if not fecha_val and last_fecha:
                         fecha_val = last_fecha
-                    elif fecha_val:
-                        last_fecha = fecha_val
 
                     # Regla Daniel:
                     principal_hi = hi_list[0]
@@ -102,6 +100,11 @@ def parse_pdf(file):
                             "hf": hf_list[0],
                             "principal": False
                         })
+                        
+                    # Solo aquí actualizamos last_fecha, después de añadir registros válidos
+                    if fecha_val:
+                        last_fecha = fecha_val
+    
     except Exception as e:
         print("[parser] Error al leer PDF:", e)
 
@@ -109,3 +112,4 @@ def parse_pdf(file):
     for r in registros[:6]:
         print("[parser] Ej:", r)
     return registros
+
