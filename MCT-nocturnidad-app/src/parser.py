@@ -1,16 +1,16 @@
 import pdfplumber
-import re
 
 def _in_range(xmid, xr, tol=2):
     return xr[0] - tol <= xmid <= xr[1] + tol
 
-def es_fecha_valida(texto):
-    return bool(re.match(r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", texto))
-
 def _find_columns(page):
+    """
+    Encuentra rangos X para columnas clave. Prioriza cabeceras reales; si falla, usa rangos fijos
+    ajustados a este modelo de TITSA.
+    """
     words = page.extract_words(use_text_flow=True)
     fecha_x = hi_x = hf_x = None
-    header_bottom = page.bbox[1] + 40
+    header_bottom = page.bbox[1] + 40  # altura aproximada bajo cabecera
 
     for w in words:
         t = (w.get("text") or "").strip().lower()
@@ -21,6 +21,7 @@ def _find_columns(page):
         elif t == "hf":
             hf_x = (w["x0"], w["x1"]); header_bottom = max(header_bottom, w["bottom"])
 
+    # Fallback “hardcodeado” para este modelo si no encuentra cabeceras
     if not (fecha_x and hi_x and hf_x):
         x0_page, x1_page = page.bbox[0], page.bbox[2]
         width = x1_page - x0_page
@@ -34,17 +35,21 @@ def parse_pdf(file):
     registros = []
     try:
         with pdfplumber.open(file) as pdf:
+            last_fecha = None
             for page in pdf.pages:
                 cols = _find_columns(page)
+                # Palabras con tolerancias pequeñas para que se agrupen por línea
                 words = page.extract_words(x_tolerance=2, y_tolerance=2, use_text_flow=False)
 
+                # Agrupar por línea (clave: y redondeada)
                 lines = {}
                 for w in words:
                     if w["top"] <= cols["header_bottom"]:
                         continue
-                    y_key = int(w["top"] // 5)
+                    y_key = round(w["top"], 1)
                     lines.setdefault(y_key, []).append(w)
 
+                # Ordenar por vertical
                 for y in sorted(lines.keys()):
                     row_words = sorted(lines[y], key=lambda k: k["x0"])
 
@@ -59,40 +64,31 @@ def parse_pdf(file):
                         elif _in_range(xmid, cols["hf"]):
                             hf_tokens.append(t)
 
+                    # Consolidar
                     fecha_val = " ".join(fecha_tokens).strip()
                     hi_raw = " ".join(hi_tokens).strip()
                     hf_raw = " ".join(hf_tokens).strip()
 
-                    # Si no hay fecha, marcamos como "0" para trazabilidad
-                    if not fecha_val or not es_fecha_valida(fecha_val):
-                        fecha_val = "0"
+                    # Heredar fecha en filas partida (rowspan visual)
+                    if not fecha_val and last_fecha:
+                        fecha_val = last_fecha
+                    elif fecha_val:
+                        last_fecha = fecha_val
 
+                    # Filtrar si no hay horas en ninguna columna
+                    if not (hi_raw or hf_raw): 
+                        continue
+
+                    # Extraer horas HH:MM y descartar ruidos (00, números sueltos)
                     hi_list = [x for x in hi_raw.split() if ":" in x and x.count(":") == 1]
                     hf_list = [x for x in hf_raw.split() if ":" in x and x.count(":") == 1]
 
-                    # Caso 1: no hay horas en ninguna columna → resultado 0
                     if not hi_list or not hf_list:
-                        registros.append({
-                            "fecha": fecha_val,
-                            "hi": 0,
-                            "hf": 0,
-                            "principal": True
-                        })
                         continue
 
-                    # Caso 2: hay horas pero no cumplen reglas de solape → resultado 0
-                    # Aquí puedes añadir tu lógica de solape; de momento marcamos como 0
-                    valido = True  # sustituir con tu regla real
-                    if not valido:
-                        registros.append({
-                            "fecha": fecha_val,
-                            "hi": 0,
-                            "hf": 0,
-                            "principal": True
-                        })
-                        continue
-
-                    # Caso 3: horas válidas → se guardan normalmente
+                    # Regla Daniel:
+                    # - Principal: HI arriba (índice 0) con HF abajo (último)
+                    # - Secundario: si hay dos, HI abajo (índice 1) con HF arriba (índice 0)
                     principal_hi = hi_list[0]
                     principal_hf = hf_list[-1]
                     registros.append({
