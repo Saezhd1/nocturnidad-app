@@ -1,62 +1,50 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Resultados de nocturnidad</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-    <h1>Informe de nocturnidad</h1>
-    <p>Empleado: {{ empleado }} | Nombre: {{ nombre }}</p>
+def export_to_html(results, output_file="result.html"):
+    global_total_min = 0
+    global_total_eur = 0.0
 
-    <h2>Detalle por tramos</h2>
-    <table border="1" cellpadding="4" cellspacing="0">
-        <tr>
-            <th>Archivo</th>
-            <th>Fecha</th>
-            <th>HI</th>
-            <th>HF</th>
-            <th>Minutos nocturnos</th>
-            <th>Importe (€)</th>
-        </tr>
-        {% for doc in resultados %}
-            {% for d in doc.dias %}
-                {% if d.minutos_nocturnos > 0 %}
-                <tr>
-                    <td>{{ doc.filename }}</td>
-                    <td>{{ d.fecha }}</td>
-                    <td>{{ d.hi }}</td>
-                    <td>{{ d.hf }}</td>
-                    <td style="text-align:right">{{ d.minutos_nocturnos }}</td>
-                    <td style="text-align:right">{{ d.importe }}</td>
-                </tr>
-                {% endif %}
-            {% endfor %}
-        {% endfor %}
-    </table>
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("<html><head><meta charset='utf-8'>")
+        f.write("<style>")
+        f.write("body { font-family: Arial, sans-serif; margin: 20px; }")
+        f.write("table {border-collapse: collapse; width: 100%; margin-bottom: 20px;}")
+        f.write("th, td {border: 1px solid #ccc; padding: 6px; text-align: center;}")
+        f.write("th {background-color: #f0f0f0;}")
+        f.write(".nocturno {background-color: #ffe0e0;}")
+        f.write("</style>")
+        f.write("</head><body>")
+        f.write("<h1>Resultados análisis PDFs</h1>")
 
-    <h2>Resumen mensual</h2>
-    <table border="1" cellpadding="4" cellspacing="0">
-        <tr>
-            <th>Mes/Año</th>
-            <th>Minutos</th>
-            <th>Importe (€)</th>
-            <th>Días con nocturnidad</th>
-        </tr>
-        {% for mes, datos in resumen.por_mes.items() %}
-        <tr>
-            <td>{{ mes }}</td>
-            <td style="text-align:right">{{ datos.minutos }}</td>
-            <td style="text-align:right">{{ "%.2f"|format(datos.importe) }}</td>
-            <td style="text-align:right">{{ datos.dias }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        # Procesar cada PDF
+        for filename, registros in results.items():
+            total_min = sum(r["nocturnidad_minutos"] for r in registros)
+            total_eur = sum(r["dinero"] for r in registros)
+            global_total_min += total_min
+            global_total_eur += total_eur
 
-    <h2>Resumen global</h2>
-    <p>Total minutos: {{ resumen.global.minutos }}</p>
-    <p>Total importe: {{ "%.2f"|format(resumen.global.importe) }}</p>
-    <p>Total días con nocturnidad: {{ resumen.global.dias }}</p>
+            f.write(f"<h2>{filename}</h2>")
+            f.write("<table>")
+            f.write("<tr><th>Fecha</th><th>HI</th><th>HF</th>"
+                    "<th>Nocturnidad (min)</th><th>Dinero (€)</th><th>Línea completa</th></tr>")
 
-    <p><a href="{{ url_for('download') }}">Descargar informe en PDF</a></p>
-</body>
-</html>
+            for r in registros:
+                clase = " class='nocturno'" if r["nocturnidad_minutos"] > 0 else ""
+                f.write(f"<tr{clase}>")
+                f.write(f"<td>{r['fecha']}</td>")
+                f.write(f"<td>{r['hi']}</td>")
+                f.write(f"<td>{r['hf']}</td>")
+                f.write(f"<td>{r['nocturnidad_minutos']}</td>")
+                f.write(f"<td>{r['dinero']:.2f}</td>")
+                f.write(f"<td>{r['linea_completa']}</td>")
+                f.write("</tr>")
+
+            f.write("</table>")
+            f.write(f"<p><b>Total minutos nocturnos en {filename}: {total_min}</b></p>")
+            f.write(f"<p><b>Total dinero en {filename}: {total_eur:.2f} €</b></p>")
+
+        # Resumen global
+        f.write("<hr>")
+        f.write("<h2>Resumen global</h2>")
+        f.write(f"<p><b>Total minutos nocturnos: {global_total_min}</b></p>")
+        f.write(f"<p><b>Total dinero: {global_total_eur:.2f} €</b></p>")
+
+        f.write("</body></html>")
