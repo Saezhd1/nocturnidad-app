@@ -1,50 +1,49 @@
-def export_to_html(results, output_file="result.html"):
-    global_total_min = 0
-    global_total_eur = 0.0
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("<html><head><meta charset='utf-8'>")
-        f.write("<style>")
-        f.write("body { font-family: Arial, sans-serif; margin: 20px; }")
-        f.write("table {border-collapse: collapse; width: 100%; margin-bottom: 20px;}")
-        f.write("th, td {border: 1px solid #ccc; padding: 6px; text-align: center;}")
-        f.write("th {background-color: #f0f0f0;}")
-        f.write(".nocturno {background-color: #ffe0e0;}")
-        f.write("</style>")
-        f.write("</head><body>")
-        f.write("<h1>Resultados análisis PDFs</h1>")
-
-        # Procesar cada PDF
-        for filename, registros in results.items():
-            total_min = sum(r["nocturnidad_minutos"] for r in registros)
-            total_eur = sum(r["dinero"] for r in registros)
-            global_total_min += total_min
-            global_total_eur += total_eur
-
-            f.write(f"<h2>{filename}</h2>")
-            f.write("<table>")
-            f.write("<tr><th>Fecha</th><th>HI</th><th>HF</th>"
-                    "<th>Nocturnidad (min)</th><th>Dinero (€)</th><th>Línea completa</th></tr>")
-
-            for r in registros:
-                clase = " class='nocturno'" if r["nocturnidad_minutos"] > 0 else ""
-                f.write(f"<tr{clase}>")
-                f.write(f"<td>{r['fecha']}</td>")
-                f.write(f"<td>{r['hi']}</td>")
-                f.write(f"<td>{r['hf']}</td>")
-                f.write(f"<td>{r['nocturnidad_minutos']}</td>")
-                f.write(f"<td>{r['dinero']:.2f}</td>")
-                f.write(f"<td>{r['linea_completa']}</td>")
-                f.write("</tr>")
-
-            f.write("</table>")
-            f.write(f"<p><b>Total minutos nocturnos en {filename}: {total_min}</b></p>")
-            f.write(f"<p><b>Total dinero en {filename}: {total_eur:.2f} €</b></p>")
-
-        # Resumen global
-        f.write("<hr>")
-        f.write("<h2>Resumen global</h2>")
-        f.write(f"<p><b>Total minutos nocturnos: {global_total_min}</b></p>")
-        f.write(f"<p><b>Total dinero: {global_total_eur:.2f} €</b></p>")
-
-        f.write("</body></html>")
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Resultados análisis PDFs</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background-color: #f0f0f0; }
+    .nocturno { background-color: #ffe0e0; }
+  </style>
+</head>
+<body>
+  <h1>Resultados análisis PDFs</h1>
+  {% set global_min = 0 %}
+  {% set global_eur = 0 %}
+  {% for filename, registros in resultados.items() %}
+    {% set total_min = registros|map(attribute='nocturnidad_minutos')|sum %}
+    {% set total_eur = registros|map(attribute='dinero')|sum %}
+    {% set global_min = global_min + total_min %}
+    {% set global_eur = global_eur + total_eur %}
+    <h2>{{ filename }}</h2>
+    <table>
+      <tr>
+        <th>Fecha</th><th>HI</th><th>HF</th>
+        <th>Nocturnidad (min)</th><th>Dinero (€)</th><th>Línea completa</th>
+      </tr>
+      {% for r in registros %}
+      <tr {% if r.nocturnidad_minutos > 0 %}class="nocturno"{% endif %}>
+        <td>{{ r.fecha }}</td>
+        <td>{{ r.hi }}</td>
+        <td>{{ r.hf }}</td>
+        <td>{{ r.nocturnidad_minutos }}</td>
+        <td>{{ "%.2f"|format(r.dinero) }}</td>
+        <td>{{ r.linea_completa }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p><b>Total minutos nocturnos en {{ filename }}: {{ total_min }}</b></p>
+    <p><b>Total dinero en {{ filename }}: {{ "%.2f"|format(total_eur) }} €</b></p>
+  {% endfor %}
+  <hr>
+  <h2>Resumen global</h2>
+  <p><b>Total minutos nocturnos: {{ global_min }}</b></p>
+  <p><b>Total dinero: {{ "%.2f"|format(global_eur) }} €</b></p>
+  <p><a href="/download">📥 Descargar PDF</a></p>
+</body>
+</html>
