@@ -1,9 +1,10 @@
 from datetime import datetime
 
-def _parse_hhmm(s):
+def _parse_hhmm(s, base_date=None):
     """
     Convierte una cadena HH:MM en datetime.
-    Soporta horas extendidas como 24:00, 25:00, etc.
+    - Si la hora es >= 24, se convierte en hora del día siguiente.
+    - El campo 'fecha' del registro se mantiene igual (la del PDF).
     """
     try:
         h, m = s.split(":")
@@ -11,8 +12,9 @@ def _parse_hhmm(s):
 
         if 0 <= m <= 59:
             if h >= 24:
-                # Ajuste: horas extendidas se interpretan como día siguiente
-                return datetime.strptime(f"{h-24:02d}:{m:02d}", "%H:%M") + timedelta(days=1)
+                # Ajuste: horas extendidas -> día siguiente
+                dt = datetime.strptime(f"{h-24:02d}:{m:02d}", "%H:%M")
+                return dt + timedelta(days=1)
             elif 0 <= h <= 23:
                 return datetime.strptime(f"{h:02d}:{m:02d}", "%H:%M")
     except Exception:
@@ -47,12 +49,9 @@ def _minutos_nocturnos(hi_dt, hf_dt):
 
 def calcular_nocturnidad_por_dia(registros):
     """
-    Calcula los minutos nocturnos y el importe por cada día a partir de los registros.
-    Cada registro debe tener: fecha, hi, hf, principal.
+    Calcula minutos nocturnos y el importe por cada día.
+    La fecha mostrada siempre es la original del PDF.
     """
-    if not registros:  # si es None o lista vacía
-        return []
-
     resultados = []
     for r in registros:
         hi_dt = _parse_hhmm(r["hi"])
@@ -62,8 +61,9 @@ def calcular_nocturnidad_por_dia(registros):
 
         minutos = _minutos_nocturnos(hi_dt, hf_dt)
         tarifa = _tarifa_por_fecha(r["fecha"])
+
         resultados.append({
-            "fecha": r["fecha"],
+            "fecha": r["fecha"],   # se mantiene la fecha original
             "hi": r["hi"],
             "hf": r["hf"],
             "minutos_nocturnos": minutos,
@@ -71,5 +71,6 @@ def calcular_nocturnidad_por_dia(registros):
             "principal": r.get("principal", True)
         })
     return resultados
+
 
 
