@@ -111,12 +111,13 @@ def parse_multiple_pdfs(files):
         r["archivo"] = os.path.basename(f)
         resultados[f] = registros
         print(f"[parser] {len(registros)} registros extraídos de {os.path.basename(f)}")
-    return registros
+    return resultados
     
     print(f"[parser] Registros extraídos: {len(registros)}")
     for r in registros[:6]:
         print("[parser] Ej:", r)
     return registros
+
 
 
 
