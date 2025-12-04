@@ -79,3 +79,31 @@ def calcular_nocturnidad_por_dia(registros):
     resultados.sort(key=lambda d: (d["fecha"], _parse_hhmm(d["hi"]) or datetime.min))
     return resultados
     
+def _tabla_mes(resumen):
+    """
+    Construye la tabla de resumen mensual a partir del diccionario 'resumen'.
+    Se espera que 'resumen' tenga una clave 'mensual' con datos por mes.
+    """
+    rows = [["Mes", "Minutos nocturnos", "Importe (€)"]]
+    for mes, datos in resumen.get("mensual", {}).items():
+        rows.append([
+            mes,
+            str(datos.get("minutos", 0)),
+            f"{datos.get('importe', 0.0):.2f}"
+        ])
+    return rows
+
+
+def _tabla_global(resumen):
+    """
+    Construye la tabla de resumen global a partir del diccionario 'resumen'.
+    Se espera que 'resumen' tenga una clave 'global' con totales.
+    """
+    rows = [["Total minutos nocturnos", "Total importe (€)"]]
+    global_data = resumen.get("global", {})
+    rows.append([
+        str(global_data.get("minutos", 0)),
+        f"{global_data.get('importe', 0.0):.2f}"
+    ])
+    return rows
+
