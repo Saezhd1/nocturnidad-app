@@ -30,21 +30,21 @@ def _tarifa_por_fecha(fecha_str):
 
 def _minutos_nocturnos(hi_dt, hf_dt):
     """
-    Calcula minutos en tramos nocturnos:
-    - 22:00 a 24:59
+    Calcula minutos en tramos nocturnos oficiales:
+    - 22:00 a 24:59 (se interpreta como hasta 00:59 del día siguiente)
     - 04:00 a 06:00
     """
     minutos = 0
     tramos = [
-        (datetime.strptime("22:00", "%H:%M"), datetime.strptime("24:59", "%H:%M")),
-        (datetime.strptime("04:00", "%H:%M"), datetime.strptime("06:00", "%H:%M")),
+        (_parse_hhmm("22:00"), _parse_hhmm("24:59")),  # aquí usamos _parse_hhmm
+        (_parse_hhmm("04:00"), _parse_hhmm("06:00")),
     ]
     for ini, fin in tramos:
-        if hi_dt <= fin and hf_dt >= ini:
-            o_ini = max(hi_dt, ini)
-            o_fin = min(hf_dt, fin)
-            if o_ini < o_fin:
-                minutos += int((o_fin - o_ini).total_seconds() / 60)
+        if hi_dt < fin and hf_dt > ini:
+            inter_ini = max(hi_dt, ini)
+            inter_fin = min(hf_dt, fin)
+            if inter_ini < inter_fin:
+                minutos += int((inter_fin - inter_ini).total_seconds() / 60)
     return minutos
 
 def calcular_nocturnidad_por_dia(registros):
@@ -71,6 +71,7 @@ def calcular_nocturnidad_por_dia(registros):
             "principal": r.get("principal", True)
         })
     return resultados
+
 
 
 
